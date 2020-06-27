@@ -644,10 +644,6 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   ClientID self_node_id_;
   boost::asio::io_service &io_service_;
   ObjectManager &object_manager_;
-  /// A Plasma object store client. This is used for creating new objects in
-  /// the object store (e.g., for actor tasks that can't be run because the
-  /// actor died) and to pin objects that are in scope in the cluster.
-  plasma::PlasmaClient store_client_;
   /// A client connection to the GCS.
   std::shared_ptr<gcs::GcsClient> gcs_client_;
   /// The object table. This is shared with the object manager.
@@ -759,8 +755,6 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// for any subsequent requests.
   absl::flat_hash_map<WorkerID, std::pair<std::unique_ptr<rpc::CoreWorkerClient>, size_t>>
       worker_rpc_clients_;
-
-  absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject>> pinned_objects_;
 
   /// Wait for a task's arguments to become ready.
   void WaitForTaskArgsRequests(std::pair<ScheduleFn, Task> &work);

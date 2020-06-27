@@ -31,6 +31,8 @@
 #include "ray/common/id.h"
 #include "ray/common/ray_config.h"
 #include "ray/common/status.h"
+#include "ray/object_manager/direct_store_call/store_call_direct.h"
+#include "ray/object_manager/direct_store_call/store_call_ipc.h"
 #include "ray/object_manager/format/object_manager_generated.h"
 #include "ray/object_manager/notification/object_store_notification_manager_ipc.h"
 #include "ray/object_manager/object_buffer_pool.h"
@@ -202,6 +204,22 @@ class ObjectManager : public ObjectManagerInterface,
   /// store.
   /// \return Status of whether adding the subscription succeeded.
   ray::Status SubscribeObjDeleted(std::function<void(const ray::ObjectID &)> callback);
+
+  /// Mark the specified object as failed with the given error type.
+  ///
+  /// \param object_id The object id to store error messages into.
+  /// \param error_type The type of the error that caused this task to fail.
+  ray::Status MarkObjectAsFailed(const ObjectID& object_id, int error_type);
+
+  /// Pin plasma objects.
+  ///
+  /// \param object_ids The object ids to be pinned.
+  ray::Status PinObjects(const std::vector<ObjectID>& object_ids);
+
+  /// Unpin a plasma object.
+  ///
+  /// \param object_id The object id to be pinned.
+  ray::Status UnPinObject(const ObjectID& object_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
@@ -393,6 +411,9 @@ class ObjectManager : public ObjectManagerInterface,
   // Process notifications from Plasma. We make it a shared pointer because
   // we will decide its type at runtime, and we would pass it to Plasma Store.
   std::shared_ptr<ObjectStoreNotificationManager> store_notification_;
+
+  std::unique_ptr<ObjectStoreCall> object_store_call_;
+
   ObjectBufferPool buffer_pool_;
 
   /// Weak reference to main service. We ensure this object is destroyed before

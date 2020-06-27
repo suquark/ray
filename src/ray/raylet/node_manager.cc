@@ -185,7 +185,6 @@ NodeManager::NodeManager(boost::asio::io_service &io_service,
             local_resources.GetTotalResources().GetResourceMap()));
   }
 
-  RAY_CHECK_OK(store_client_.Connect(config.store_socket_name.c_str()));
   // Run the node manger rpc server.
   node_manager_server_.RegisterService(node_manager_service_);
   node_manager_server_.Run();
@@ -2101,10 +2100,9 @@ void NodeManager::TreatTaskAsFailed(const Task &task, const ErrorType &error_typ
 void NodeManager::MarkObjectsAsFailed(const ErrorType &error_type,
                                       const std::vector<ObjectID> objects_to_fail,
                                       const JobID &job_id) {
-  const std::string meta = std::to_string(static_cast<int>(error_type));
   for (const auto &object_id : objects_to_fail) {
-    Status status = store_client_.CreateAndSeal(object_id, "", meta);
-    if (!status.ok() && !status.IsObjectExists()) {
+    Status status = object_manager_.MarkObjectAsFailed(object_id, static_cast<int>(error_type));
+    if (!status.ok()) {
       // If we failed to save the error code, log a warning and push an error message
       // to the driver.
       std::ostringstream stream;
@@ -3396,41 +3394,13 @@ void NodeManager::HandlePinObjectIDs(const rpc::PinObjectIDsRequest &request,
     for (const auto &object_id_binary : request.object_ids()) {
       object_ids.push_back(ObjectID::FromBinary(object_id_binary));
     }
-    std::vector<plasma::ObjectBuffer> plasma_results;
-    // TODO(swang): This `Get` has a timeout of 0, so the plasma store will not
-    // block when serving the request. However, if the plasma store is under
-    // heavy load, then this request can still block the NodeManager event loop
-    // since we must wait for the plasma store's reply. We should consider using
-    // an `AsyncGet` instead.
-    if (!store_client_.Get(object_ids, /*timeout_ms=*/0, &plasma_results).ok()) {
-      RAY_LOG(WARNING) << "Failed to get objects to be pinned from object store.";
+    Status status = object_manager_.PinObjects(object_ids);
+    if (!status.ok()) {
+      RAY_LOG(WARNING) << "Failed to get objects to be pinned from object store. "
+                       << status.ToString();
       // TODO(suquark): Maybe "Status::ObjectNotFound" is more accurate here.
       send_reply_callback(Status::Invalid("Failed to get objects."), nullptr, nullptr);
       return;
-    }
-
-    // Pin the requested objects until the owner notifies us that the objects can be
-    // unpinned by responding to the WaitForObjectEviction message.
-    // TODO(edoakes): we should be batching these requests instead of sending one per
-    // pinned object.
-    for (int64_t i = 0; i < request.object_ids().size(); i++) {
-      ObjectID object_id = ObjectID::FromBinary(request.object_ids(i));
-
-      if (plasma_results[i].data == nullptr) {
-        RAY_LOG(ERROR) << "Plasma object " << object_id
-                       << " was evicted before the raylet could pin it.";
-        continue;
-      }
-
-      RAY_LOG(DEBUG) << "Pinning object " << object_id;
-      RAY_CHECK(
-          pinned_objects_
-              .emplace(
-                  object_id,
-                  std::unique_ptr<RayObject>(new RayObject(
-                      std::make_shared<PlasmaBuffer>(plasma_results[i].data),
-                      std::make_shared<PlasmaBuffer>(plasma_results[i].metadata), {})))
-              .second);
     }
   }
 
@@ -3450,7 +3420,7 @@ void NodeManager::HandlePinObjectIDs(const rpc::PinObjectIDsRequest &request,
                              << object_id;
           }
           RAY_LOG(DEBUG) << "Unpinning object " << object_id;
-          pinned_objects_.erase(object_id);
+          RAY_CHECK_OK(object_manager_.UnPinObject(object_id));
 
           // Try to evict all copies of the object from the cluster.
           if (free_objects_period_ >= 0) {

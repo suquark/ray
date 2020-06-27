@@ -80,6 +80,8 @@ ObjectManager::ObjectManager(asio::io_service &main_service, const ClientID &sel
   store_notification_->SubscribeObjDeleted(
       [this](const ObjectID &oid) { NotifyDirectoryObjectDeleted(oid); });
 
+  object_store_call_.reset(new ObjectStoreCallIPC(config_.store_socket_name));
+
   // Start object manager rpc server and send & receive request threads
   StartRpcService();
 }
@@ -160,6 +162,18 @@ ray::Status ObjectManager::SubscribeObjDeleted(
     std::function<void(const ObjectID &)> callback) {
   store_notification_->SubscribeObjDeleted(callback);
   return ray::Status::OK();
+}
+
+ray::Status ObjectManager::MarkObjectAsFailed(const ObjectID& object_id, int error_type) {
+  return object_store_call_->MarkObjectAsFailed(object_id, error_type);
+}
+
+ray::Status ObjectManager::PinObjects(const std::vector<ObjectID>& object_ids) {
+  return object_store_call_->PinObjects(object_ids);
+}
+
+ray::Status ObjectManager::UnPinObject(const ObjectID& object_id) {
+  return object_store_call_->UnPinObject(object_id);
 }
 
 ray::Status ObjectManager::Pull(const ObjectID &object_id) {
