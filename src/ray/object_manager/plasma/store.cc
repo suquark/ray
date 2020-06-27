@@ -112,14 +112,7 @@ PlasmaStore::~PlasmaStore() {}
 
 const PlasmaStoreInfo* PlasmaStore::GetPlasmaStoreInfo() { return &store_info_; }
 
-// If this client is not already using the object, add the client to the
-// object's list of clients, otherwise do nothing.
-void PlasmaStore::AddToClientObjectIds(const ObjectID& object_id, ObjectTableEntry* entry,
-                                       Client* client) {
-  // Check if this client is already using the object.
-  if (client->object_ids.find(object_id) != client->object_ids.end()) {
-    return;
-  }
+void PlasmaStore::IncreaseObjectRefCount(const ObjectID& object_id, ObjectTableEntry* entry) {
   // If there are no other clients using this object, notify the eviction policy
   // that the object is being used.
   if (entry->ref_count == 0) {
@@ -128,7 +121,17 @@ void PlasmaStore::AddToClientObjectIds(const ObjectID& object_id, ObjectTableEnt
   }
   // Increase reference count.
   entry->ref_count++;
+}
 
+// If this client is not already using the object, add the client to the
+// object's list of clients, otherwise do nothing.
+void PlasmaStore::AddToClientObjectIds(const ObjectID& object_id, ObjectTableEntry* entry,
+                                       Client* client) {
+  // Check if this client is already using the object.
+  if (client->object_ids.find(object_id) != client->object_ids.end()) {
+    return;
+  }
+  IncreaseObjectRefCount(object_id, entry);
   // Add object id to the list of object ids that this client is using.
   client->object_ids.insert(object_id);
 }
@@ -512,27 +515,30 @@ void PlasmaStore::ProcessGetRequest(Client* client,
   }
 }
 
+void PlasmaStore::DecreaseObjectRefCount(const ObjectID& object_id, ObjectTableEntry* entry) {
+  // Decrease reference count.
+  entry->ref_count--;
+  // If no more clients are using this object, notify the eviction policy
+  // that the object is no longer being used.
+  if (entry->ref_count == 0) {
+    if (deletion_cache_.count(object_id) == 0) {
+      // Tell the eviction policy that this object is no longer being used.
+      eviction_policy_.EndObjectAccess(object_id);
+    } else {
+      // Above code does not really delete an object. Instead, it just put an
+      // object to LRU cache which will be cleaned when the memory is not enough.
+      deletion_cache_.erase(object_id);
+      EvictObjects({object_id});
+    }
+  }
+}
+
 int PlasmaStore::RemoveFromClientObjectIds(const ObjectID& object_id,
                                            ObjectTableEntry* entry, Client* client) {
   auto it = client->object_ids.find(object_id);
   if (it != client->object_ids.end()) {
     client->object_ids.erase(it);
-    // Decrease reference count.
-    entry->ref_count--;
-
-    // If no more clients are using this object, notify the eviction policy
-    // that the object is no longer being used.
-    if (entry->ref_count == 0) {
-      if (deletion_cache_.count(object_id) == 0) {
-        // Tell the eviction policy that this object is no longer being used.
-        eviction_policy_.EndObjectAccess(object_id);
-      } else {
-        // Above code does not really delete an object. Instead, it just put an
-        // object to LRU cache which will be cleaned when the memory is not enough.
-        deletion_cache_.erase(object_id);
-        EvictObjects({object_id});
-      }
-    }
+    DecreaseObjectRefCount(object_id, entry);
     // Return 1 to indicate that the client was removed.
     return 1;
   } else {

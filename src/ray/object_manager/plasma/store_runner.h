@@ -17,7 +17,18 @@ class PlasmaStoreRunner {
   void Shutdown();
   void SetNotificationListener(
       const std::shared_ptr<ray::ObjectStoreNotificationManager> &notification_listener) {
+    RAY_CHECK(store_ != nullptr);
     store_->SetNotificationListener(notification_listener);
+  }
+
+  Status PinObjectInStore(const ObjectID& object_id) {
+    RAY_CHECK(store_ != nullptr);
+    return store_->PinObjectInStore(object_id);
+  }
+
+  Status UnPinObjectInStore(const ObjectID& object_id) {
+    RAY_CHECK(store_ != nullptr);
+    return store_->UnPinObjectInStore(object_id);
   }
 
  private:

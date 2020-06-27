@@ -31,8 +31,7 @@
 #include "ray/common/id.h"
 #include "ray/common/ray_config.h"
 #include "ray/common/status.h"
-#include "ray/object_manager/direct_store_call/store_call_direct.h"
-#include "ray/object_manager/direct_store_call/store_call_ipc.h"
+#include "ray/object_manager/object_store_ipc/object_store_ipc.h"
 #include "ray/object_manager/format/object_manager_generated.h"
 #include "ray/object_manager/notification/object_store_notification_manager_ipc.h"
 #include "ray/object_manager/object_buffer_pool.h"
@@ -412,7 +411,10 @@ class ObjectManager : public ObjectManagerInterface,
   // we will decide its type at runtime, and we would pass it to Plasma Store.
   std::shared_ptr<ObjectStoreNotificationManager> store_notification_;
 
-  std::unique_ptr<ObjectStoreCall> object_store_call_;
+  // Objects pinned in store.
+  std::unordered_set<ObjectID> pinned_objects_;
+
+  std::unique_ptr<ObjectStoreIPC> object_store_ipc_;
 
   ObjectBufferPool buffer_pool_;
 

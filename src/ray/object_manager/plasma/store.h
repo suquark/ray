@@ -188,7 +188,35 @@ class PlasmaStore {
     }
   }
 
+  Status PinObjectInStore(const ObjectID& object_id) {
+    auto entry = GetObjectTableEntry(&store_info_, object_id);
+    if (entry == nullptr) {
+      return Status::ObjectNotFound("Cannot find the object " + object_id.Hex() + " to be pinned in store. ");
+    }
+    if (entry->state == ObjectState::PLASMA_CREATED) {
+      return Status::Invalid("Cannot pin an unsealed object.");
+    }
+    if (entry->state == ObjectState::PLASMA_EVICTED) {
+      return Status::Invalid("Cannot pin an evicted object.");
+    }
+    IncreaseObjectRefCount(object_id, entry);
+    return Status::OK();
+  }
+
+  Status UnPinObjectInStore(const ObjectID& object_id) {
+    auto entry = GetObjectTableEntry(&store_info_, object_id);
+    if (entry == nullptr) {
+      return Status::ObjectNotFound("Cannot find the object " + object_id.Hex() + " to be pinned in store. ");
+    }
+    DecreaseObjectRefCount(object_id, entry);
+    return Status::OK();
+  }
+
  private:
+  void IncreaseObjectRefCount(const ObjectID& object_id, ObjectTableEntry* entry);
+
+  void DecreaseObjectRefCount(const ObjectID& object_id, ObjectTableEntry* entry);
+
   void PushNotification(ObjectInfoT* object_notification);
 
   void PushNotifications(const std::vector<ObjectInfoT>& object_notifications);

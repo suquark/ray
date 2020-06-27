@@ -80,7 +80,7 @@ ObjectManager::ObjectManager(asio::io_service &main_service, const ClientID &sel
   store_notification_->SubscribeObjDeleted(
       [this](const ObjectID &oid) { NotifyDirectoryObjectDeleted(oid); });
 
-  object_store_call_.reset(new ObjectStoreCallIPC(config_.store_socket_name));
+  object_store_ipc_.reset(new ObjectStoreIPC(config_.store_socket_name));
 
   // Start object manager rpc server and send & receive request threads
   StartRpcService();
@@ -165,15 +165,37 @@ ray::Status ObjectManager::SubscribeObjDeleted(
 }
 
 ray::Status ObjectManager::MarkObjectAsFailed(const ObjectID& object_id, int error_type) {
-  return object_store_call_->MarkObjectAsFailed(object_id, error_type);
+  return object_store_ipc_->MarkObjectAsFailed(object_id, error_type);
 }
 
 ray::Status ObjectManager::PinObjects(const std::vector<ObjectID>& object_ids) {
-  return object_store_call_->PinObjects(object_ids);
+  if (plasma::plasma_store_runner) {
+    for (const auto &object_id: object_ids) {
+      if (pinned_objects_.count(object_id) == 0) {
+        RAY_LOG(DEBUG) << "Pinning object " << object_id;
+        RAY_RETURN_NOT_OK(plasma::plasma_store_runner->PinObjectInStore(object_id));
+        pinned_objects_.insert(object_id);
+      }
+    }
+  } else {
+    return object_store_ipc_->PinObjects(object_ids);
+  }
+  return Status::OK();
 }
 
 ray::Status ObjectManager::UnPinObject(const ObjectID& object_id) {
-  return object_store_call_->UnPinObject(object_id);
+  if (plasma::plasma_store_runner) {
+    if (pinned_objects_.count(object_id) > 0) {
+      RAY_LOG(DEBUG) << "Unpinning object " << object_id;
+      pinned_objects_.erase(object_id);
+      return plasma::plasma_store_runner->UnPinObjectInStore(object_id);
+    } else {
+      RAY_LOG(ERROR) << "Unpin an object without pinning it first.";
+    }
+  } else {
+    return object_store_ipc_->UnPinObject(object_id);
+  }
+  return Status::OK();
 }
 
 ray::Status ObjectManager::Pull(const ObjectID &object_id) {
