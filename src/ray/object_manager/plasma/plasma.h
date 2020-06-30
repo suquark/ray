@@ -111,6 +111,8 @@ struct PlasmaObject {
   /// Size of the underlying map.
   int64_t map_size;
 
+  bool initialized = false;
+
   bool operator==(const PlasmaObject& other) const {
     return (
 #ifdef PLASMA_CUDA

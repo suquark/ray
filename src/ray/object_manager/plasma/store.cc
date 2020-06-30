@@ -187,6 +187,8 @@ void PlasmaStore::ReturnFromGet(GetRequest* get_req) {
     if (object.data_size != -1 && fds_to_send.count(fd) == 0 && fd != -1) {
       fds_to_send.insert(fd);
       store_fds.push_back(fd);
+      RAY_CHECK(object.map_size > 0) << "ObjectID = " << object_id.Hex() << ", fd = " << fd << ", data_size = " << object.data_size << ", initialized = " << object.initialized
+                                     << "\n" << object_directory->GetObjectDebugString(object_id);
       mmap_sizes.push_back(object.map_size);
     }
   }

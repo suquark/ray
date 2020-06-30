@@ -189,18 +189,14 @@ class ClientMmapTableEntry {
     length_ = map_size - kMmapRegionsGap;
 #ifdef _WIN32
     pointer_ = reinterpret_cast<uint8_t*>(MapViewOfFile(reinterpret_cast<HANDLE>(fh_get(fd)), FILE_MAP_ALL_ACCESS, 0, 0, length_));
-    // TODO(pcm): Don't fail here, instead return a Status.
-    if (pointer_ == NULL) {
-      RAY_LOG(FATAL) << "mmap failed";
-    }
 #else
     pointer_ = reinterpret_cast<uint8_t*>(
         mmap(NULL, length_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+#endif
     // TODO(pcm): Don't fail here, instead return a Status.
     if (pointer_ == MAP_FAILED) {
-      RAY_LOG(FATAL) << "mmap failed";
+      RAY_LOG(FATAL) << "mmap failed. fd = " << fd << ", map_size = " << map_size;
     }
-#endif
     close(fd);  // Closing this fd has an effect on performance.
   }
 

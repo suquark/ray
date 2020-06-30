@@ -98,6 +98,14 @@ struct ObjectTableEntry {
 
   int64_t ObjectSize() const { return data_size + metadata_size; }
 
+  // Cleanup memory mapping info
+  void Reset() {
+    fd = -1;
+    pointer = nullptr;
+    offset = 0;
+    map_size = 0;
+  }
+
   void FreeObject();
 
   Status AllocateMemory(int device_id, size_t size);
@@ -256,6 +264,37 @@ class ObjectDirectory {
 
   void RefreshObjects(const std::vector<ObjectID>& object_ids) {
     eviction_policy_.RefreshObjects(object_ids);
+  }
+
+  std::string GetObjectDebugString(const ObjectID& object_id) {
+    absl::MutexLock lock(&object_table_mutex_);
+    auto entry = GetObjectTableEntry(object_id);
+    if (entry == nullptr) {
+      return "Object " + object_id.Hex() + " not found.";
+    }
+    std::stringstream result;
+    result << "Object " << object_id.Hex() << " info:";
+    result << "\ndevice_num: " << entry->device_num;
+    result << "\ndata_size: " << entry->data_size;
+    result << "\nmetadata_size: " << entry->metadata_size;
+    result << "\nfd: " << entry->fd;
+    result << "\nmap_size: " << entry->map_size;
+    result << "\npointer: " << int64_t(entry->pointer);
+    result << "\nref_count: " << entry->ref_count;
+    switch (entry->state) {
+      case ObjectState::PLASMA_CREATED:
+        result << "\nstate: PLASMA_CREATED";
+        break;
+      case ObjectState::PLASMA_SEALED:
+        result << "\nstate: PLASMA_SEALED";
+        break;
+      case ObjectState::PLASMA_EVICTED:
+        result << "\nstate: PLASMA_EVICTED";
+        break;
+      default:
+        result << "\nstate: UNKNOWN(" << int(entry->state) << ")";
+    }
+    return result.str();
   }
 
   std::string DebugString() const {

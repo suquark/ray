@@ -28,8 +28,7 @@ void ObjectTableEntry::FreeObject() {
     RAY_CHECK_OK(context->Free(pointer, buff_size));
 #endif
   }
-  pointer = nullptr;
-  map_size = 0;
+  Reset();
   state = ObjectState::PLASMA_EVICTED;
 }
 
@@ -44,6 +43,7 @@ Status ObjectTableEntry::AllocateMemory(int device_id, size_t size) {
     // 64-byte aligned, but in practice it often will be.
     uint8_t* address = reinterpret_cast<uint8_t*>(PlasmaAllocator::Memalign(kBlockSize, size));
     if (!address) {
+      Reset();
       return Status::ObjectStoreFull("Cannot allocate object.");
     }
     pointer = address;
@@ -57,6 +57,7 @@ Status ObjectTableEntry::AllocateMemory(int device_id, size_t size) {
     // The IPC handle will keep the buffer memory alive
     Status s = cuda_buffer->ExportForIpc().Value(&ipc_handle);
     if (!s.ok()) {
+      Reset();
       RAY_LOG(ERROR) << "Failed to allocate CUDA memory: " << s.ToString();
       return s;
     }
@@ -85,12 +86,15 @@ void PlasmaObject_init(PlasmaObject* object, ObjectTableEntry* entry) {
   }
 #endif
   object->store_fd = entry->fd;
+  RAY_LOG(INFO) << "STORE_FD:STORE_FD:STORE_FD:STORE_FD:STORE_FD:STORE_FD:" << object->store_fd;
   object->data_offset = entry->offset;
   object->metadata_offset = entry->offset + entry->data_size;
   object->data_size = entry->data_size;
   object->metadata_size = entry->metadata_size;
   object->device_num = entry->device_num;
   object->map_size = entry->map_size;
+  RAY_LOG(INFO) << "MAP_SIZE:MAP_SIZE:MAP_SIZE:MAP_SIZE:MAP_SIZE:MAP_SIZE:" << object->map_size;
+  object->initialized = true;
 }
 
 ObjectDirectory::ObjectDirectory(
