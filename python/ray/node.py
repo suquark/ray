@@ -119,10 +119,6 @@ class Node:
         self._redis_address = ray_params.redis_address
         self._config = ray_params._internal_config or {}
 
-        # Enable Plasma Store as a thread by default.
-        if "plasma_store_as_thread" not in self._config:
-            self._config["plasma_store_as_thread"] = True
-
         if head:
             redis_client = None
             # date including microsecond
@@ -602,25 +598,6 @@ class Node:
             redis_client = self.create_redis_client()
             redis_client.hmset("webui", {"url": self._webui_url})
 
-    def start_plasma_store(self):
-        """Start the plasma store."""
-        stdout_file, stderr_file = self.get_log_file_handles(
-            "plasma_store", unique=True)
-        process_info = ray.services.start_plasma_store(
-            self.get_resource_spec(),
-            self._plasma_store_socket_name,
-            stdout_file=stdout_file,
-            stderr_file=stderr_file,
-            plasma_directory=self._ray_params.plasma_directory,
-            huge_pages=self._ray_params.huge_pages,
-            keep_idle=bool(self._config.get("plasma_store_as_thread")),
-            fate_share=self.kernel_fate_share)
-        assert (
-            ray_constants.PROCESS_TYPE_PLASMA_STORE not in self.all_processes)
-        self.all_processes[ray_constants.PROCESS_TYPE_PLASMA_STORE] = [
-            process_info,
-        ]
-
     def start_gcs_server(self):
         """Start the gcs server.
         """
@@ -760,7 +737,6 @@ class Node:
             "Process STDOUT and STDERR is being redirected to {}.".format(
                 self._logs_dir))
 
-        self.start_plasma_store()
         self.start_raylet()
         self.start_reporter()
 

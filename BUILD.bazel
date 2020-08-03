@@ -398,18 +398,6 @@ cc_library(
     ],
 )
 
-cc_binary(
-    name = "plasma_store_server",
-    srcs = [
-        "src/ray/plasma/store_exec.cc",
-    ],
-    copts = PLASMA_COPTS,
-    visibility = ["//visibility:public"],
-    deps = [
-        ":plasma_store_server_lib",
-    ],
-)
-
 FLATC_ARGS = [
     "--gen-object-api",
     "--gen-mutable",
@@ -1985,12 +1973,6 @@ copy_to_workspace(
     dstdir = "python/ray/core/src/ray/gcs",
 )
 
-copy_to_workspace(
-    name = "cp_plasma_store_server",
-    srcs = [":plasma_store_server"],
-    dstdir = "python/ray/core/src/plasma",
-)
-
 genrule(
     name = "ray_pkg",
     srcs = [
@@ -2002,7 +1984,6 @@ genrule(
         ":cp_libray_redis_module",
         ":cp_raylet",
         ":cp_gcs_server",
-        ":cp_plasma_store_server",
         "//streaming:copy_streaming_py_proto",
     ],
     outs = ["ray_pkg.out"],

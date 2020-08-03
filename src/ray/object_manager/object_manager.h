@@ -32,7 +32,7 @@
 #include "ray/common/ray_config.h"
 #include "ray/common/status.h"
 #include "ray/object_manager/format/object_manager_generated.h"
-#include "ray/object_manager/notification/object_store_notification_manager_ipc.h"
+#include "ray/object_manager/notification/object_store_notification_manager.h"
 #include "ray/object_manager/object_buffer_pool.h"
 #include "ray/object_manager/object_directory.h"
 #include "ray/object_manager/plasma/store_runner.h"

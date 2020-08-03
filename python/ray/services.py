@@ -1403,16 +1403,16 @@ def start_raylet(redis_address,
         "--session_dir={}".format(session_dir),
         "--metrics-agent-port={}".format(metrics_agent_port),
     ]
-    if config.get("plasma_store_as_thread"):
-        # command related to the plasma store
-        plasma_directory, object_store_memory = determine_plasma_store_config(
-            resource_spec.object_store_memory, plasma_directory, huge_pages)
-        command += [
-            "--object_store_memory={}".format(object_store_memory),
-            "--plasma_directory={}".format(plasma_directory),
-        ]
-        if huge_pages:
-            command.append("--huge_pages")
+    # command related to the plasma store
+    plasma_directory, object_store_memory = determine_plasma_store_config(
+        resource_spec.object_store_memory, plasma_directory, huge_pages)
+    command += [
+        "--object_store_memory={}".format(object_store_memory),
+        "--plasma_directory={}".format(plasma_directory),
+    ]
+    if huge_pages:
+        command.append("--huge_pages")
+    # other commands
     if socket_to_use:
         socket_to_use.close()
     if head_node:
